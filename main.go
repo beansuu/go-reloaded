@@ -1,33 +1,42 @@
- package main
+package main
 
- import "fmt"
+import (
+    "bufio"
+    "fmt"
+    "os"
+    "strings"
+    "strconv"
+    "unicode"
+)
 
- func checkText(line string) string {
+func checkText(line string) string {
     words := strings.Fields(line)
 
     for i := 0; i < len(words); i++ {
         word := words[i]
         switch word {
-            // replace the word before with the decimal(in this case kuueteistkümnendnumber) version of the word
         case "(hex)":
             if i > 0 {
                 prevWord := words[i-1]
                 if hexValue, err := strconv.ParseInt(prevWord, 16, 64); err == nil {
                     words[i-1] = fmt.Sprintf("%d", hexValue)
+                    // Remove the (hex) marker
+                    words = append(words[:i], words[i+1:]...)
                 }
             }
-            // replace the word before with the decimal(in this case kahendnumber) version of the word 
         case "(bin)":
             if i > 0 {
                 prevWord := words[i-1]
                 if binValue, err := strconv.ParseInt(prevWord, 2, 64); err == nil {
                     words[i-1] = fmt.Sprintf("%d", binValue)
+                    // Remove the (bin) marker
+                    words = append(words[:i], words[i+1:]...)
                 }
             }
         case "(low)", "(cap)", "(up)":
             if i > 0 {
                 prevWord := words[i-1]
-                if ModifiedWithNumber(words, i) {
+                if modifiedWithNumber(words, i) {
                     count, _ := strconv.Atoi(words[i+2])
                     transformFunc := strings.ToLower
                     if word == "(cap)" {
@@ -35,43 +44,46 @@
                     } else if word == "(up)" {
                         transformFunc = strings.ToUpper
                     }
-                    words[i-1] transformFunc(prevWord)
+                    words[i-1] = transformFunc(prevWord)
                     for j := 0; j < count; j++ {
                         if i+3+j < len(words) {
                             words[i+3+j] = transformFunc(words[i+3+j])
                         }
                     }
-                    i += 2 + count
+                    // Remove the marker and count
+                    words = append(words[:i], words[i+3+count:]...)
                 } else {
                     transformFunc := strings.ToLower
                     if word == "(cap)" {
                         transformFunc = strings.Title
                     } else if word == "(up)" {
-                        transformFunc == string.ToUpper
+                        transformFunc = strings.ToUpper
                     }
                     words[i-1] = transformFunc(prevWord)
+                    // Remove the marker
+                    words = append(words[:i], words[i+1:]...)
                 }
             }
         }
     }
+    return strings.Join(words, " ")
+}
 
- }
-
- func ModifiedWithNumber(words []string, index int) bool {
+func modifiedWithNumber(words []string, index int) bool {
     return len(words) > index+2 && words[index+1] == ","
- }
+}
 
- func formatPunctuation(text string) string {
-	text = strings.ReplaceAll(text, " ,", ",")
-	text = strings.ReplaceAll(text, " .", ".")
-	text = strings.ReplaceAll(text, " !", "!")
-	text = strings.ReplaceAll(text, " ?", "?")
-	text = strings.ReplaceAll(text, " :", ":")
-	text = strings.ReplaceAll(text, " ;", ";")
+func formatPunctuation(text string) string {
+    text = strings.ReplaceAll(text, " ,", ",")
+    text = strings.ReplaceAll(text, " .", ".")
+    text = strings.ReplaceAll(text, " !", "!")
+    text = strings.ReplaceAll(text, " ?", "?")
+    text = strings.ReplaceAll(text, " :", ":")
+    text = strings.ReplaceAll(text, " ;", ";")
 
-	text = strings.ReplaceAll(text, "...", "...")
-	text = strings.ReplaceAll(text, "!?", "!?")
-	return text
+    text = strings.ReplaceAll(text, "...", "...")
+    text = strings.ReplaceAll(text, "!?", "!?")
+    return text
 }
 
 func handleAAn(text string) string {
@@ -79,7 +91,7 @@ func handleAAn(text string) string {
     for i := 0; i < len(words)-1; i++ {
         word := words[i]
         nextWord := words[i+1]
-        if word == "a" && (startsWithVowel(nextWord) || string.HasPreFix(nextWord, "h")) {
+        if word == "a" && (startsWithVowel(nextWord) || strings.HasPrefix(nextWord, "h")) {
             words[i] = "an"
         }
     }
@@ -94,17 +106,25 @@ func startsWithVowel(s string) bool {
 }
 
 func main() {
-    if len(os.args) != 3 {
+    if len(os.Args) != 3 {
         fmt.Println("Usage: go run main.go sample.txt result.txt")
         os.Exit(1)
     }
-    sample.txt := os.Args[1]
-    result.txt := os.Args[2]
+    sampleTxt := os.Args[1]
+    resultTxt := os.Args[2]
 
-    inputFile, _ := os.Open(sample.txt)
+    inputFile, err := os.Open(sampleTxt)
+    if err != nil {
+        fmt.Println("Error opening input file:", err)
+        os.Exit(1)
+    }
     defer inputFile.Close()
 
-    outputFile, _ := os.Create(result.txt)
+    outputFile, err := os.Create(resultTxt)
+    if err != nil {
+        fmt.Println("Error creating output file:", err)
+        os.Exit(1)
+    }
     defer outputFile.Close()
 
     scanner := bufio.NewScanner(inputFile)
@@ -114,5 +134,5 @@ func main() {
         modifiedLine := checkText(line)
         fmt.Fprintln(outputFile, modifiedLine)
     }
-    fmt.Println("Editing complete. Output written to", result.txt)
+    fmt.Println("Editing complete. Output written to", resultTxt)
 }
