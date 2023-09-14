@@ -59,3 +59,16 @@
  func ModifiedWithNumber(words []string, index int) bool {
     return len(words) > index+2 && words[index+1] == ","
  }
+
+ func formatPunctuation(text string) string {
+	text = strings.ReplaceAll(text, " ,", ",")
+	text = strings.ReplaceAll(text, " .", ".")
+	text = strings.ReplaceAll(text, " !", "!")
+	text = strings.ReplaceAll(text, " ?", "?")
+	text = strings.ReplaceAll(text, " :", ":")
+	text = strings.ReplaceAll(text, " ;", ";")
+
+	text = strings.ReplaceAll(text, "...", "...")
+	text = strings.ReplaceAll(text, "!?", "!?")
+	return text
+}
