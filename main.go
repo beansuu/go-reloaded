@@ -72,3 +72,21 @@
 	text = strings.ReplaceAll(text, "!?", "!?")
 	return text
 }
+
+func handleAAn(text string) string {
+    words := strings.Fields(text)
+    for i := 0; i < len(words)-1; i++ {
+        word := words[i]
+        nextWord := words[i+1]
+        if word == "a" && (startsWithVowel(nextWord) || string.HasPreFix(nextWord, "h")) {
+            words[i] = "an"
+        }
+    }
+    return strings.Join(words, " ")
+}
+
+func startsWithVowel(s string) bool {
+    firstChar := []rune(s)[0]
+    return unicode.Is(unicode.Latin, firstChar) &&
+        (firstChar == 'a' || firstChar == 'e' || firstChar == 'i' || firstChar == 'o' || firstChar == 'u')
+}
