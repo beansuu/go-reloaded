@@ -4,6 +4,7 @@
 
  func checkText(line string) string {
     words := strings.Fields(line)
+
     for i := 0; i < len(words); i++ {
         word := words[i]
         switch word {
@@ -85,8 +86,33 @@ func handleAAn(text string) string {
     return strings.Join(words, " ")
 }
 
+// vowel = täishäälik
 func startsWithVowel(s string) bool {
     firstChar := []rune(s)[0]
     return unicode.Is(unicode.Latin, firstChar) &&
         (firstChar == 'a' || firstChar == 'e' || firstChar == 'i' || firstChar == 'o' || firstChar == 'u')
+}
+
+func main() {
+    if len(os.args) != 3 {
+        fmt.Println("Usage: go run main.go sample.txt result.txt")
+        os.Exit(1)
+    }
+    sample.txt := os.Args[1]
+    result.txt := os.Args[2]
+
+    inputFile, _ := os.Open(sample.txt)
+    defer inputFile.Close()
+
+    outputFile, _ := os.Create(result.txt)
+    defer outputFile.Close()
+
+    scanner := bufio.NewScanner(inputFile)
+
+    for scanner.Scan() {
+        line := scanner.Text()
+        modifiedLine := checkText(line)
+        fmt.Fprintln(outputFile, modifiedLine)
+    }
+    fmt.Println("Editing complete. Output written to", result.txt)
 }
