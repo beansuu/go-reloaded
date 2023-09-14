@@ -1,138 +1,140 @@
 package main
 
 import (
-    "bufio"
-    "fmt"
-    "os"
-    "strings"
-    "strconv"
-    "unicode"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"unicode/utf8"
 )
 
-func checkText(line string) string {
-    words := strings.Fields(line)
+var (
+	wordArray []string
+	flag      bool
+)
 
-    for i := 0; i < len(words); i++ {
-        word := words[i]
-        switch word {
-        case "(hex)":
-            if i > 0 {
-                prevWord := words[i-1]
-                if hexValue, err := strconv.ParseInt(prevWord, 16, 64); err == nil {
-                    words[i-1] = fmt.Sprintf("%d", hexValue)
-                    // Remove the (hex) marker
-                    words = append(words[:i], words[i+1:]...)
-                }
-            }
-        case "(bin)":
-            if i > 0 {
-                prevWord := words[i-1]
-                if binValue, err := strconv.ParseInt(prevWord, 2, 64); err == nil {
-                    words[i-1] = fmt.Sprintf("%d", binValue)
-                    // Remove the (bin) marker
-                    words = append(words[:i], words[i+1:]...)
-                }
-            }
-        case "(low)", "(cap)", "(up)":
-            if i > 0 {
-                prevWord := words[i-1]
-                if modifiedWithNumber(words, i) {
-                    count, _ := strconv.Atoi(words[i+2])
-                    transformFunc := strings.ToLower
-                    if word == "(cap)" {
-                        transformFunc = strings.Title
-                    } else if word == "(up)" {
-                        transformFunc = strings.ToUpper
-                    }
-                    words[i-1] = transformFunc(prevWord)
-                    for j := 0; j < count; j++ {
-                        if i+3+j < len(words) {
-                            words[i+3+j] = transformFunc(words[i+3+j])
-                        }
-                    }
-                    // Remove the marker and count
-                    words = append(words[:i], words[i+3+count:]...)
-                } else {
-                    transformFunc := strings.ToLower
-                    if word == "(cap)" {
-                        transformFunc = strings.Title
-                    } else if word == "(up)" {
-                        transformFunc = strings.ToUpper
-                    }
-                    words[i-1] = transformFunc(prevWord)
-                    // Remove the marker
-                    words = append(words[:i], words[i+1:]...)
-                }
-            }
-        }
-    }
-    return strings.Join(words, " ")
+func CheckBracket(pos int) int {
+	switch wordArray[pos][:4] {
+	case "(bin":
+		ConvertNumber(pos-1, 2)
+	case "(hex":
+		ConvertNumber(pos-1, 16)
+	case "(cap":
+		ConvertString(pos, strings.Title)
+	case "(up,", "(up)":
+		ConvertString(pos, strings.ToUpper)
+	case "(low":
+		ConvertString(pos, strings.ToLower)
+	default:
+		pos++
+	}
+	return pos - 1
 }
 
-func modifiedWithNumber(words []string, index int) bool {
-    return len(words) > index+2 && words[index+1] == ","
+func ConvertNumber(pos, base int) {
+	decimalValue, err := strconv.ParseInt(wordArray[pos], base, 64)
+	if err != nil {
+		fmt.Println("Error: Unable to convert to decimal.")
+		os.Exit(1)
+	}
+	wordArray[pos] = strconv.Itoa(int(decimalValue))
+	removeItems(pos+1, 1)
 }
 
-func formatPunctuation(text string) string {
-    text = strings.ReplaceAll(text, " ,", ",")
-    text = strings.ReplaceAll(text, " .", ".")
-    text = strings.ReplaceAll(text, " !", "!")
-    text = strings.ReplaceAll(text, " ?", "?")
-    text = strings.ReplaceAll(text, " :", ":")
-    text = strings.ReplaceAll(text, " ;", ";")
+func ConvertString(pos int, transformFunc func(string) string) {
+	if len(wordArray)-1 == pos {
+		wordArray[pos-1] = transformFunc(wordArray[pos-1])
+		removeItems(pos, 1)
+		return
+	}
 
-    text = strings.ReplaceAll(text, "...", "...")
-    text = strings.ReplaceAll(text, "!?", "!?")
-    return text
+	count, err := strconv.Atoi(wordArray[pos+1][:len(wordArray[pos+1])-1])
+	if err == nil {
+		for index := pos - 1; index >= pos-int(count); index-- {
+			wordArray[index] = transformFunc(wordArray[index])
+		}
+		removeItems(pos, count)
+	} else {
+		wordArray[pos-1] = transformFunc(wordArray[pos-1])
+		removeItems(pos, 1)
+	}
 }
 
-func handleAAn(text string) string {
-    words := strings.Fields(text)
-    for i := 0; i < len(words)-1; i++ {
-        word := words[i]
-        nextWord := words[i+1]
-        if word == "a" && (startsWithVowel(nextWord) || strings.HasPrefix(nextWord, "h")) {
-            words[i] = "an"
-        }
-    }
-    return strings.Join(words, " ")
+func CorrectPunctuation(pos int) int {
+	if strings.ContainsRune(".,!?:;", rune(wordArray[pos][0])) {
+		wordArray[pos-1] += string(wordArray[pos][0])
+		wordArray[pos] = wordArray[pos][1:]
+		if len(wordArray[pos]) == 0 {
+			removeItems(pos, 1)
+			pos--
+		}
+		pos = CorrectPunctuation(pos)
+	}
+	return pos
 }
 
-// vowel = täishäälik
-func startsWithVowel(s string) bool {
-    firstChar := []rune(s)[0]
-    return unicode.Is(unicode.Latin, firstChar) &&
-        (firstChar == 'a' || firstChar == 'e' || firstChar == 'i' || firstChar == 'o' || firstChar == 'u')
+func HandleArticles(pos int) {
+	firstLetter := string(wordArray[pos+1][0])
+	if strings.ContainsAny(firstLetter, "aeiouh") && (wordArray[pos] == "a" || wordArray[pos] == "A") {
+		wordArray[pos] += "n"
+	} else if !strings.ContainsAny(firstLetter, "aeiouh") && (wordArray[pos] == "an" || wordArray[pos] == "An") {
+		wordArray[pos] = string(wordArray[pos][0])
+	}
+}
+
+func AdjustCommas(pos int) {
+	initial, size1 := utf8.DecodeRuneInString(wordArray[pos])
+	final, size2 := utf8.DecodeLastRune([]byte(wordArray[pos]))
+
+	if size1 != 3 || size2 != 3 {
+		return
+	}
+
+	if flag {
+		if string(final) == "‘" {
+			wordArray[pos] = wordArray[pos][size2:] + "’"
+		}
+		if wordArray[pos] == "’" {
+			wordArray[pos-1] += "’"
+			removeItems(pos, 1)
+		}
+		flag = false
+	} else {
+		if string(initial) == "’" {
+			wordArray[pos] = "‘" + wordArray[pos][size1:]
+		}
+		if wordArray[pos] == "‘" {
+			wordArray[pos+1] = "‘" + wordArray[pos+1]
+			removeItems(pos, 1)
+		}
+		flag = true
+	}
+}
+
+func ParseContent() {
+	fileContent, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Println("Error: File not found.")
+		os.Exit(1)
+	}
+	wordArray = strings.Fields(string(fileContent))
+}
+
+func removeItems(index, count int) {
+	wordArray = append(wordArray[:index], wordArray[index+count:]...)
 }
 
 func main() {
-    if len(os.Args) != 3 {
-        fmt.Println("Usage: go run main.go sample.txt result.txt")
-        os.Exit(1)
-    }
-    sampleTxt := os.Args[1]
-    resultTxt := os.Args[2]
-
-    inputFile, err := os.Open(sampleTxt)
-    if err != nil {
-        fmt.Println("Error opening input file:", err)
-        os.Exit(1)
-    }
-    defer inputFile.Close()
-
-    outputFile, err := os.Create(resultTxt)
-    if err != nil {
-        fmt.Println("Error creating output file:", err)
-        os.Exit(1)
-    }
-    defer outputFile.Close()
-
-    scanner := bufio.NewScanner(inputFile)
-
-    for scanner.Scan() {
-        line := scanner.Text()
-        modifiedLine := checkText(line)
-        fmt.Fprintln(outputFile, modifiedLine)
-    }
-    fmt.Println("Editing complete. Output written to", resultTxt)
+	ParseContent()
+	for i := 0; i < len(wordArray); i++ {
+		if len(wordArray[i]) > 3 {
+			i = CheckBracket(i)
+		}
+		i = CorrectPunctuation(i)
+		if i != len(wordArray)-1 {
+			HandleArticles(i)
+		}
+		AdjustCommas(i)
+	}
+	os.WriteFile("result.txt", []byte(strings.Join(wordArray, " ")), 0644)
 }
