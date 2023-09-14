@@ -55,3 +55,7 @@
     }
 
  }
+
+ func ModifiedWithNumber(words []string, index int) bool {
+    return len(words) > index+2 && words[index+1] == ","
+ }
