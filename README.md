@@ -5,4 +5,4 @@ go run . sample.txt result.txt
 
 This should output result.txt which shows the result of your written sample.
 
-## 9/15/2023 - Made a new version of the exercise using regex(regular expressions). 
+## 15/9/2023 - Made a new version of the exercise using regex(regular expressions). 
